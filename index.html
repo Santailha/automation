@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disparador de Leads para Webhook</title>
+    <!-- Incluindo o Tailwind CSS para um design moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilo customizado para a fonte e para a barra de rolagem do log */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Efeito de digitação no placeholder */
+        .typing-placeholder::placeholder {
+            animation: typing 3s steps(30, end) infinite, blink-caret .75s step-end infinite;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: .15em solid orange;
+        }
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: orange; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6 md:p-8 space-y-6">
+        
+        <!-- Cabeçalho -->
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-gray-800">Disparador de Leads em Lote</h1>
+            <p class="text-gray-500 mt-2">Cole os IDs dos leads, informe seu webhook do Make.com e inicie o envio controlado.</p>
+        </div>
+
+        <!-- Formulário de Configuração -->
+        <div class="space-y-4">
+            <div>
+                <label for="webhookUrl" class="block text-sm font-medium text-gray-700 mb-1">URL do Webhook (Make.com)</label>
+                <input type="url" id="webhookUrl" placeholder="https://hook.us1.make.com/sua-chave-unica" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+            </div>
+            <div>
+                <label for="leads" class="block text-sm font-medium text-gray-700 mb-1">IDs dos Leads (um por linha)</label>
+                <textarea id="leads" rows="10" placeholder="ID-LEAD-001&#10;ID-LEAD-002&#10;ID-LEAD-003&#10;..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="flex flex-col sm:flex-row gap-4">
+            <button id="startButton" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Iniciar Envio
+            </button>
+            <button id="stopButton" class="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition flex items-center justify-center gap-2" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                Parar Envio
+            </button>
+        </div>
+        
+        <!-- Painel de Status e Logs -->
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h2 class="text-lg font-semibold text-gray-800 mb-3">Status do Processo</h2>
+            <!-- Contadores -->
+            <div id="statusCounters" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
+                <div class="bg-gray-200 p-3 rounded-lg">
+                    <p class="text-sm text-gray-600">Total</p>
+                    <p id="totalCount" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-lg">
+                    <p class="text-sm text-blue-600">Aguardando</p>
+                    <p id="pendingCount" class="text-2xl font-bold text-blue-800">0</p>
+                </div>
+                <div class="bg-green-100 p-3 rounded-lg">
+                    <p class="text-sm text-green-600">Sucesso</p>
+                    <p id="successCount" class="text-2xl font-bold text-green-800">0</p>
+                </div>
+                <div class="bg-red-100 p-3 rounded-lg">
+                    <p class="text-sm text-red-600">Falhas</p>
+                    <p id="errorCount" class="text-2xl font-bold text-red-800">0</p>
+                </div>
+            </div>
+
+            <!-- Logs -->
+            <h3 class="text-md font-semibold text-gray-700 mb-2">Logs em tempo real:</h3>
+            <div id="log" class="w-full h-48 bg-gray-900 text-white text-sm font-mono p-4 rounded-lg overflow-y-auto log-container">
+                <p class="text-gray-400">&gt; Aguardando início do processo...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mapeamento dos elementos do HTML
+        const webhookUrlInput = document.getElementById('webhookUrl');
+        const leadsTextarea = document.getElementById('leads');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const logContainer = document.getElementById('log');
+
+        const totalCountEl = document.getElementById('totalCount');
+        const pendingCountEl = document.getElementById('pendingCount');
+        const successCountEl = document.getElementById('successCount');
+        const errorCountEl = document.getElementById('errorCount');
+
+        // Variáveis de estado
+        let leadsQueue = [];
+        let isSending = false;
+        let processInterval;
+        let currentIndex = 0;
+        let counters = { total: 0, success: 0, error: 0 };
+
+        // Função para adicionar mensagens ao log
+        function logMessage(message, type = 'info') {
+            const now = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            
+            let typeClass = 'text-gray-400';
+            if (type === 'success') typeClass = 'text-green-400';
+            if (type === 'error') typeClass = 'text-red-400';
+            if (type === 'warn') typeClass = 'text-yellow-400';
+
+            p.innerHTML = `<span class="text-gray-500">${now}</span> <span class="${typeClass}">&gt; ${message}</span>`;
+            logContainer.appendChild(p);
+            // Rola para a mensagem mais recente
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Função para atualizar os contadores na tela
+        function updateCounters() {
+            totalCountEl.textContent = counters.total;
+            successCountEl.textContent = counters.success;
+            errorCountEl.textContent = counters.error;
+            const pending = counters.total - counters.success - counters.error;
+            pendingCountEl.textContent = pending > 0 ? pending : 0;
+        }
+
+        // Função para enviar um único lead para o webhook
+        async function sendLead(leadId) {
+            const webhookUrl = webhookUrlInput.value.trim();
+            logMessage(`Enviando lead: ${leadId}...`);
+            
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // O Make espera um corpo, mesmo que seja um JSON simples
+                    body: JSON.stringify({ id: leadId, sentAt: new Date().toISOString() })
+                });
+
+                if (response.ok) {
+                    logMessage(`Sucesso ao enviar o lead: ${leadId}`, 'success');
+                    counters.success++;
+                } else {
+                    const responseText = await response.text();
+                    logMessage(`Falha ao enviar ${leadId}. Status: ${response.status}. Resposta: ${responseText}`, 'error');
+                    counters.error++;
+                }
+            } catch (error) {
+                logMessage(`Erro de rede ao enviar ${leadId}: ${error.message}`, 'error');
+                counters.error++;
+            } finally {
+                updateCounters();
+            }
+        }
+        
+        // Função principal que processa a fila de leads
+        function processQueue() {
+            if (currentIndex >= leadsQueue.length) {
+                logMessage('🎉 Processo finalizado! Todos os leads foram enviados.', 'success');
+                stopSending();
+                return;
+            }
+
+            const currentLead = leadsQueue[currentIndex];
+            sendLead(currentLead);
+            currentIndex++;
+        }
+
+        // Função para iniciar o processo
+        function startSending() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                logMessage('Por favor, insira a URL do Webhook.', 'error');
+                alert('A URL do Webhook é obrigatória!');
+                return;
+            }
+
+            const leadsRaw = leadsTextarea.value.trim();
+            leadsQueue = leadsRaw.split('\n').map(lead => lead.trim()).filter(lead => lead); // Remove linhas vazias
+
+            if (leadsQueue.length === 0) {
+                logMessage('Nenhum lead válido para enviar. Adicione IDs na área de texto.', 'error');
+                alert('Nenhum lead válido encontrado!');
+                return;
+            }
+
+            // Reseta o estado
+            isSending = true;
+            currentIndex = 0;
+            counters = { total: leadsQueue.length, success: 0, error: 0 };
+            logContainer.innerHTML = ''; // Limpa o log anterior
+            updateCounters();
+
+            logMessage(`Processo iniciado. ${leadsQueue.length} leads na fila.`);
+            logMessage(`Um lead será enviado a cada 20 segundos.`, 'warn');
+
+            // Habilita/desabilita botões
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            webhookUrlInput.disabled = true;
+            leadsTextarea.disabled = true;
+            
+            // Inicia o envio imediatamente e depois a cada 20 segundos
+            processQueue(); 
+            processInterval = setInterval(processQueue, 20000); 
+        }
+
+        // Função para parar o processo
+        function stopSending(userStopped = false) {
+            clearInterval(processInterval);
+            isSending = false;
+
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            webhookUrlInput.disabled = false;
+            leadsTextarea.disabled = false;
+            
+            if(userStopped) {
+                logMessage('Processo interrompido pelo usuário.', 'warn');
+            }
+        }
+
+        // Adiciona os eventos aos botões
+        startButton.addEventListener('click', startSending);
+        stopButton.addEventListener('click', () => stopSending(true));
+
+    </script>
+</body>
+</html>
